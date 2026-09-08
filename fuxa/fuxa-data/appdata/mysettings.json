@@ -1,0 +1,43 @@
+{
+    "language": "en",
+    "hideEditorOnboarding": true,
+    "editorSectionMessages": {
+        "hideDevicePluginsNotice": true,
+        "hideArMarkersNotice": false
+    },
+    "uiPort": 1881,
+    "secureEnabled": false,
+    "secretCode": "",
+    "tokenExpiresIn": "",
+    "broadcastAll": false,
+    "lazyViewLoading": false,
+    "smtp": {
+        "host": "",
+        "port": 587,
+        "mailsender": "",
+        "username": ""
+    },
+    "daqstore": {
+        "type": "influxDB",
+        "url": "http://influxdb:8086",
+        "host": "127.0.0.1",
+        "tableName": "meters",
+        "configurationString": "http::addr=localhost:9000;",
+        "organization": "brewery",
+        "credentials": {
+            "token": "changeme_admin_token"
+        },
+        "bucket": "brewery_data",
+        "retention": "days14"
+    },
+    "alarms": {
+        "retention": "year1"
+    },
+    "logs": {
+        "retention": "none"
+    },
+    "logFull": false,
+    "nodeRedEnabled": false,
+    "nodeRedAuthMode": "secure",
+    "swaggerEnabled": false
+}

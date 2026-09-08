@@ -20,3 +20,9 @@ dist/
 .env
 *.pem
 *.key
+
+# fuxa
+fuxa/fuxa-data/db/*
+fuxa/fuxa-data/logs/*
+fuxa/fuxa-data/images/*
+fuxa/fuxa-data/appdata/alarms.fuxap.db
