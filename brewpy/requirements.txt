@@ -1,0 +1,5 @@
+loguru
+pymodbus==3.12.0
+pyyaml
+simple_pid
+influxdb-client
