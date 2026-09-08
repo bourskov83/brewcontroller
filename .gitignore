@@ -1,0 +1,22 @@
+# macOS
+.DS_Store
+
+# VS Code
+.vscode/
+
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# PlatformIO
+.pio/
+
+# Build artifacts
+build/
+dist/
+
+# Secrets
+.env
+*.pem
+*.key
