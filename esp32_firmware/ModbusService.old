@@ -1,0 +1,213 @@
+#include "ModbusService.h"
+
+ModbusService::ModbusService(DS18B20Manager &ds,
+                             GPIOManager &gpio,
+                             ConfigStore &cfg)
+    : _ds(ds), _gpio(gpio), _cfg(cfg) {}
+
+void ModbusService::begin()
+{
+  // Load ROMs from NVS
+  for (uint16_t i = 0; i < DS_MAX_SLOTS; i++)
+  {
+    uint64_t rom = 0;
+    _cfg.loadROM(i, rom);
+    _slotROM[i] = rom;
+  }
+  _ds.applyMapping(_slotROM);
+
+  // Modbus RTU (over USB Serial)
+  MODBUS_SERIAL.begin(MODBUS_BAUD, MODBUS_CONFIG);
+  _mb.begin(&MODBUS_SERIAL);
+  _mb.server(MODBUS_SLAVE_ID);
+
+  // Declare Holding Registers
+  _mb.addHreg(REG_SENSOR_COUNT);
+  _mb.addHreg(REG_TEMPS_BASE, REG_TEMPS_COUNT);
+
+  // Logical Slot ROM config area
+  _mb.addHreg(REG_ROM_BASE, DS_MAX_SLOTS * REG_ROM_STRIDE);
+
+  // Control registers
+  _mb.addHreg(REG_APPLY_MAPPING);
+  _mb.addHreg(REG_CLEAR_CONFIG);
+
+  // Coils for GPIOs
+  _mb.addCoil(0, 0, NUM_GPIO_OUTPUTS);
+
+  // Present ROM table: count + (MAX_DISC * 4 words)
+  _mb.addHreg(REG_PRESENT_BASE); // PRESENT_COUNT
+  _mb.addHreg(REG_PRESENT_BASE + 1, DS18B20Manager::MAX_DISC * 4);
+
+  // Seed ROM HRs with what we loaded from NVS
+  for (uint16_t s = 0; s < DS_MAX_SLOTS; s++)
+    setSlotROM_intoHR(s, _slotROM[s]);
+
+  // ---------------------------
+  // Write callbacks (library expects cb: uint16_t(TRegister*, uint16_t))
+  // ---------------------------
+
+  // ROM area: accept writes to the 4-word blocks per slot (defer apply)
+  _mb.onSetHreg(
+      REG_ROM_BASE,
+      [this](TRegister *reg, uint16_t val) -> uint16_t
+      {
+        // Just store to the local map; commit on APPLY_MAPPING
+        reg->value = val;
+        return reg->value;
+      },
+      DS_MAX_SLOTS *REG_ROM_STRIDE);
+
+  // APPLY_MAPPING: commit HR -> NVS, re-bind mapping
+  _mb.onSetHreg(
+      REG_APPLY_MAPPING,
+      [this](TRegister *reg, uint16_t val) -> uint16_t
+      {
+        if (val == 0xA5A5)
+        {
+          for (uint16_t s = 0; s < DS_MAX_SLOTS; s++)
+          {
+            uint64_t rom = getSlotROM_fromHR(s);
+            _slotROM[s] = rom;
+            _cfg.saveROM(s, rom);
+          }
+          applyMappingFromConfig();
+          reg->value = 0; // auto-clear
+        }
+        else
+        {
+          reg->value = val;
+        }
+        return reg->value;
+      },
+      1);
+
+  // CLEAR_CONFIG: wipe NVS and clear mapping
+  _mb.onSetHreg(
+      REG_CLEAR_CONFIG,
+      [this](TRegister *reg, uint16_t val) -> uint16_t
+      {
+        if (val == 0xDEAD)
+        {
+          _cfg.clearAll();
+          for (uint16_t s = 0; s < DS_MAX_SLOTS; s++)
+          {
+            _slotROM[s] = 0;
+            setSlotROM_intoHR(s, 0);
+          }
+          applyMappingFromConfig();
+          reg->value = 0; // auto-clear
+        }
+        else
+        {
+          reg->value = val;
+        }
+        return reg->value;
+      },
+      1);
+
+  // Coils: keep hardware in sync with coil value
+  _mb.onSetCoil(
+      0,
+      [this](TRegister *reg, uint16_t val) -> uint16_t
+      {
+        // NOTE: reg->address is TAddress; numeric offset is reg->address.address
+        // (Documented in library API; examples also print reg->address.address)
+        uint16_t idx = reg->address.address; // offset was 0, so this equals absolute coil index
+        bool on = (val != 0);
+        if (idx < NUM_GPIO_OUTPUTS)
+          _gpio.setOutput(idx, on);
+        reg->value = on ? 0xFF00 : 0x0000;
+        return 0;
+      },
+      NUM_GPIO_OUTPUTS);
+}
+
+void ModbusService::startTask(UBaseType_t prio, uint32_t stack, BaseType_t core)
+{
+  xTaskCreatePinnedToCore(taskTrampoline, "ModbusTask", stack, this, prio, nullptr, core);
+}
+
+void ModbusService::taskTrampoline(void *arg)
+{
+  reinterpret_cast<ModbusService *>(arg)->taskLoop();
+}
+
+void ModbusService::taskLoop()
+{
+  while (true)
+  {
+    _mb.task();
+
+    // Update read-only sensor data
+    _mb.Hreg(REG_SENSOR_COUNT, _ds.getPresentCount());
+    for (uint16_t i = 0; i < REG_TEMPS_COUNT; i++)
+      _mb.Hreg(REG_TEMPS_BASE + i, (uint16_t)_ds.readSlotTemp_x100(i));
+
+    // Mirror Present ROMs (read-only discovery table)
+    publishPresentROMs();
+
+    vTaskDelay(pdMS_TO_TICKS(10));
+  }
+}
+
+void ModbusService::publishPresentROMs()
+{
+  uint16_t pc = _ds.getPresentCount();
+  _mb.Hreg(REG_PRESENT_BASE, pc);
+
+  // Clear full region (avoid stale values)
+  for (uint16_t i = 0; i < DS18B20Manager::MAX_DISC; i++)
+  {
+    uint16_t base = REG_PRESENT_BASE + 1 + i * 4;
+    _mb.Hreg(base + 0, 0);
+    _mb.Hreg(base + 1, 0);
+    _mb.Hreg(base + 2, 0);
+    _mb.Hreg(base + 3, 0);
+  }
+
+  // Write each present ROM
+  for (uint16_t i = 0; i < pc; i++)
+  {
+    uint64_t rom;
+    if (_ds.getPresentROM(i, rom))
+    {
+      uint16_t base = REG_PRESENT_BASE + 1 + i * 4;
+      _mb.Hreg(base + 0, (uint16_t)(rom & 0xFFFF));
+      _mb.Hreg(base + 1, (uint16_t)((rom >> 16) & 0xFFFF));
+      _mb.Hreg(base + 2, (uint16_t)((rom >> 32) & 0xFFFF));
+      _mb.Hreg(base + 3, (uint16_t)((rom >> 48) & 0xFFFF));
+    }
+  }
+}
+
+// ----------------------------
+// Helpers
+// ----------------------------
+uint64_t ModbusService::getSlotROM_fromHR(uint16_t slot)
+{
+  uint16_t base = REG_ROM_BASE + slot * REG_ROM_STRIDE;
+  uint64_t rom = 0;
+
+  rom |= (uint64_t)_mb.Hreg(base + 0) << 0;
+  rom |= (uint64_t)_mb.Hreg(base + 1) << 16;
+  rom |= (uint64_t)_mb.Hreg(base + 2) << 32;
+  rom |= (uint64_t)_mb.Hreg(base + 3) << 48;
+
+  return rom;
+}
+
+void ModbusService::setSlotROM_intoHR(uint16_t slot, uint64_t rom)
+{
+  uint16_t base = REG_ROM_BASE + slot * REG_ROM_STRIDE;
+
+  _mb.Hreg(base + 0, (uint16_t)(rom & 0xFFFF));
+  _mb.Hreg(base + 1, (uint16_t)((rom >> 16) & 0xFFFF));
+  _mb.Hreg(base + 2, (uint16_t)((rom >> 32) & 0xFFFF));
+  _mb.Hreg(base + 3, (uint16_t)((rom >> 48) & 0xFFFF));
+}
+
+void ModbusService::applyMappingFromConfig()
+{
+  _ds.applyMapping(_slotROM);
+}

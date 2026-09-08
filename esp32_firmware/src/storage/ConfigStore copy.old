@@ -1,0 +1,34 @@
+#pragma once
+#include <Arduino.h>
+#include <Preferences.h>
+#include "../config.h"
+
+// Stores 64-bit ROM per slot in NVS.
+// Key scheme: "r%02u" -> 8-byte blob.
+class ConfigStore {
+public:
+  void begin(const char* ns = "ds18cfg") { _prefs.begin(ns, false); }
+  void end() { _prefs.end(); }
+
+  bool loadROM(uint16_t slot, uint64_t& rom) {
+    char key[8]; snprintf(key, sizeof(key), "r%02u", slot);
+    size_t got = _prefs.getBytesLength(key);
+    if (got != 8) { rom = 0; return false; }
+    uint64_t val = 0;
+    _prefs.getBytes(key, &val, 8);
+    rom = val;
+    return true;
+  }
+
+  void saveROM(uint16_t slot, uint64_t rom) {
+    char key[8]; snprintf(key, sizeof(key), "r%02u", slot);
+    _prefs.putBytes(key, &rom, 8);
+  }
+
+  void clearAll() {
+    _prefs.clear();
+  }
+
+private:
+  Preferences _prefs;
+};
