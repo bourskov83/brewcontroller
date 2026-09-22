@@ -199,7 +199,7 @@ class ScanTask:
             log.debug(f"{e}")
             log.debug(f"{traceback.format_exc()}")
 
-    def _calucate_target_diff(self, target_temp: int, actual_temp: int) -> int: 
+    def _calucate_target_delta(self, target_temp: int, actual_temp: int) -> int: 
         """
         Calculate difference between target and actual temp, returns diff
         """
@@ -207,13 +207,13 @@ class ScanTask:
             return None
         return actual_temp - target_temp
     
-    def _update_diff_tags(self) -> None:
+    def _update_delta_tags(self) -> None:
         """
-        update diff tags for targets
+        update temp delta tags for targets
         """
         try:
-            self.tags.write("mash_target_diff", self._calucate_target_diff(self.tags.read("mash_target_temp")[0], self.tags.read("mlt_temp")[0]))
-            self.tags.write("sparge_target_diff", self._calucate_target_diff(self.tags.read("sparge_target_temp")[0], self.tags.read("hlt_temp")[0]))
-            self.tags.write("chill_target_diff", self._calucate_target_diff(self.tags.read("chill_target_temp")[0], self.tags.read("bk_temp")[0]))
+            self.tags.write("mash_target_delta", self._calucate_target_delta(self.tags.read("mash_target_temp")[0], self.tags.read("mlt_temp")[0]))
+            self.tags.write("sparge_target_delta", self._calucate_target_delta(self.tags.read("sparge_target_temp")[0], self.tags.read("hlt_temp")[0]))
+            self.tags.write("chill_target_delta", self._calucate_target_delta(self.tags.read("chill_target_temp")[0], self.tags.read("bk_temp")[0]))
         except Exception as e:
             log.error(e)

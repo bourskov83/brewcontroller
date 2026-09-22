@@ -2,6 +2,8 @@
 #include <Arduino.h>
 #include "../config.h"
 
+// GPIOManager class for handling digital input / oututs
+
 class GPIOManager {
 public:
   void begin();

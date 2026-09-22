@@ -8,7 +8,7 @@
     "uiPort": 1881,
     "secureEnabled": false,
     "secretCode": "",
-    "tokenExpiresIn": "",
+    "tokenExpiresIn": "1h",
     "broadcastAll": false,
     "lazyViewLoading": false,
     "smtp": {
@@ -24,11 +24,11 @@
         "tableName": "meters",
         "configurationString": "http::addr=localhost:9000;",
         "organization": "brewery",
+        "bucket": "brewery_data",
+        "retention": "days14",
         "credentials": {
             "token": "changeme_admin_token"
-        },
-        "bucket": "brewery_data",
-        "retention": "days14"
+        }
     },
     "alarms": {
         "retention": "year1"

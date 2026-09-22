@@ -4,6 +4,8 @@
 #include <DallasTemperature.h>
 #include "../config.h"
 
+// DS18B20 Temperature manager class for handling data acquisition from one-wire sensors 
+
 // Utilities to convert between 64-bit ROM and DallasTemperature DeviceAddress.
 static inline void rom64_to_addr(uint64_t rom, DeviceAddress addr)
 {

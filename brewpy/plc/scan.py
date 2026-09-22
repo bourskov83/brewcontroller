@@ -226,10 +226,12 @@ class ScanTask:
                 log.debug(f"{e}")
                 log.debug(f"{traceback.format_exc()}")
 
-    def _calculate_target_diff(self, target_temp: int, actual_temp: int) -> int: 
+    def _calculate_target_delta(self, target_temp: int, actual_temp: int) -> int: 
         """
-        Calculate difference between target and actual temp, returns diff
+        Calculate difference between target and actual temp, returns delta
         """
+        if target_temp == 0:
+            return 0
         if actual_temp is None:
             return None
         return actual_temp - target_temp
@@ -265,11 +267,11 @@ class ScanTask:
         update diff tags for targets
         """
         try:
-            self.tags.write("mash_target_diff", self._calculate_target_diff(self.tags.read("mash_target_temp")[0], self.tags.read("mlt_temp")[0]))
-            self.tags.write("sparge_target_diff", self._calculate_target_diff(self.tags.read("sparge_target_temp")[0], self.tags.read("hlt_temp")[0]))
-            self.tags.write("pitch_target_diff", self._calculate_target_diff(self.tags.read("pitch_target_temp")[0], self.tags.read("bk_temp")[0]))
-            self.tags.write("chill_max_wort_delta", self._calculate_target_diff(self.tags.read("chill_inlet_temp")[0], self.tags.read("bk_temp")[0]))
-            self.tags.write("chill_delta", self._calculate_target_diff(self.tags.read("chill_inlet_temp")[0], self.tags.read("chill_outlet_temp")[0]))
+            self.tags.write("mash_target_delta", self._calculate_target_delta(self.tags.read("mash_target_temp")[0], self.tags.read("mlt_temp")[0]))
+            self.tags.write("sparge_target_delta", self._calculate_target_delta(self.tags.read("sparge_target_temp")[0], self.tags.read("hlt_temp")[0]))
+            self.tags.write("pitch_target_delta", self._calculate_target_delta(self.tags.read("pitch_target_temp")[0], self.tags.read("bk_temp")[0]))
+            self.tags.write("chill_max_wort_delta", self._calculate_target_delta(self.tags.read("chill_inlet_temp")[0], self.tags.read("bk_temp")[0]))
+            self.tags.write("chill_delta", self._calculate_target_delta(self.tags.read("chill_inlet_temp")[0], self.tags.read("chill_outlet_temp")[0]))
 
 
         except Exception as e:
