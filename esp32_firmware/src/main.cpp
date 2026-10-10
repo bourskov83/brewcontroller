@@ -3,27 +3,46 @@
 #include "storage/ConfigStore.h"
 #include "Managers/DS18B20Manager.h"
 #include "Managers/GPIOManager.h"
+#include "Managers/SlotConfigManager.h"
 #include "ModbusHandler/ModbusService.h"
+
+#include "esp_log.h"
+
+static const char *TAG = "MAIN";
 
 ConfigStore    cfg;
 DS18B20Manager dsMgr;
 GPIOManager    gpioMgr;
-ModbusService  mbs(dsMgr, gpioMgr, cfg);
+SlotConfigManager slotCfg(cfg, dsMgr);
+ModbusService  mbs(dsMgr, gpioMgr, slotCfg);
 
 void setup() {
   Serial.begin(115200);
+  delay(200); // delay to stabilize serial as a precaution
+  ESP_LOGI(TAG, "serial monitor initialized");
 
-  delay(200);
-
+  ESP_LOGI(TAG, "init ConfigStore");
   cfg.begin();
+
+  ESP_LOGI(TAG, "init GPIOManager");
   gpioMgr.begin();
-  dsMgr.begin();
-  dsMgr.startTask(1, 4096, tskNO_AFFINITY);
 
-  mbs.begin();
-  mbs.startTask(2, 4096, tskNO_AFFINITY);
+
   
+  ESP_LOGI(TAG, "init DS18B20Manager");
+  dsMgr.begin();
 
+  ESP_LOGI(TAG, "init SlotConfigManager");
+  slotCfg.begin();
+
+  ESP_LOGI(TAG, "DS18B20Manager: startTask");
+  dsMgr.startTask(1, 4096, 0);
+
+  ESP_LOGI(TAG, "init ModbusService");
+  mbs.begin();
+  mbs.startTask(2, 4096, 1);
+
+  ESP_LOGI(TAG, "init sequence complete");
 }
 
 void loop() {

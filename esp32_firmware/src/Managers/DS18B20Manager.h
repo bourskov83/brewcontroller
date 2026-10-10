@@ -3,6 +3,8 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
 #include "../config.h"
+#include "esp_log.h"
+
 
 // DS18B20 Temperature manager class for handling data acquisition from one-wire sensors 
 
@@ -32,10 +34,8 @@ public:
   // Logical slots
   void applyMapping(const uint64_t slotROMs[DS_MAX_SLOTS]);
 
-  void applyOffsets(const int16_t slotOffsets_x100[DS_MAX_SLOTS]); 
 
   int16_t readSlotTemp_x100(uint16_t slot) const;
-  int16_t readSlotRawTemp_x100(uint16_t slot) const;
 
   // Present ROMs table (for Modbus discovery)
   uint16_t getPresentCount() const { return _presentCount; }
@@ -64,7 +64,5 @@ private:
 
   // Logical ROM mapping
   uint64_t _slotROM[DS_MAX_SLOTS] = {};
-  int16_t _slotOffset_x100[DS_MAX_SLOTS] = {0};
-  int16_t _slotRawTemp_x100[DS_MAX_SLOTS] = {0}; 
   int16_t _slotTemp_x100[DS_MAX_SLOTS] = {0};
 };

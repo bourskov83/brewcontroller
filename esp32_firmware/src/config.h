@@ -3,7 +3,7 @@
 
 // ---------- OneWire / DS18B20 ----------
 #define ONEWIRE_PIN                32
-#define DS_MAX_SLOTS               10        // logical slots
+#define DS_MAX_SLOTS               10        // amount of sensor slots allocated
 #define DS_RESOLUTION_BITS         12
 #define SENSOR_UPDATE_INTERVAL_MS  790
 
@@ -21,8 +21,6 @@ static const bool GPIO_ACTIVE_HIGH[] =  {false, false,  false,  true};
 // ---------- Modbus Map ----------
 #define REG_SENSOR_COUNT           0
 #define REG_TEMPS_BASE             10
-#define REG_TEMPS_RAW_BASE         30
-#define REG_TEMPS_OFFSET_BASE      50
 #define REG_TEMPS_COUNT            DS_MAX_SLOTS
 
 
@@ -45,3 +43,16 @@ static const bool GPIO_ACTIVE_HIGH[] =  {false, false,  false,  true};
 
 // Sentinel for invalid temperature
 #define TEMP_INVALID_SENTINEL      (-32768)
+
+
+// =====================================================================
+// Compile-time sanity checks
+// =====================================================================
+static_assert(DS_RESOLUTION_BITS >= 9 && DS_RESOLUTION_BITS <= 12,
+              "DS_RESOLUTION_BITS must be 9-12 (DS18B20 supported range)");
+
+static_assert(DS_MAX_SLOTS > 0 && DS_MAX_SLOTS <= 99,
+              "DS_MAX_SLOTS must be 1 to 99");
+
+static_assert(SENSOR_UPDATE_INTERVAL_MS > 0,
+              "SENSOR_UPDATE_INTERVAL_MS must be positive");
