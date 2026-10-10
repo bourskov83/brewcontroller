@@ -21,8 +21,12 @@ void GPIOManager::setOutput(uint16_t index, bool state) {
     return;
   }
   bool physicalState = GPIO_ACTIVE_HIGH[index] ? state : !state;
+  uint8_t level = physicalState ? HIGH : LOW;
+  bool changed = (digitalRead(GPIO_OUTPUT_PINS[index]) != level);
   digitalWrite(GPIO_OUTPUT_PINS[index], physicalState ? HIGH : LOW);
-  ESP_LOGI(TAG, "pin %u -> %s", index, state ? "ON" : "OFF");
+
+  if (changed)
+    LOGI(TAG, "pin %u -> %s", index, state ? "ON" : "OFF");
 }
 
 // Get current state of output pins

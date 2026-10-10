@@ -11,14 +11,14 @@ void DS18B20Manager::begin()
   _sensors.begin();
   _sensors.setResolution(DS_RESOLUTION_BITS);
   _sensors.setWaitForConversion(false);
-  ESP_LOGI(TAG, "1-wire pin=%d resolution=%d bits", ONEWIRE_PIN, DS_RESOLUTION_BITS);
-  busScan();
+
+  LOGI(TAG, "1-wire pin=%d resolution=%d bits", ONEWIRE_PIN, DS_RESOLUTION_BITS);
 }
 
 void DS18B20Manager::startTask(UBaseType_t prio, uint32_t stack, BaseType_t core)
 {
   xTaskCreatePinnedToCore(taskTrampoline, "DS18Task", stack, this, prio, nullptr, core);
-  ESP_LOGI(TAG, "task started (core=%d prio=%u stack=%u)", core, prio, stack);
+  LOGI(TAG, "task started (core=%d prio=%u stack=%u)", core, prio, stack);
 }
 
 void DS18B20Manager::taskTrampoline(void *arg)
@@ -29,8 +29,8 @@ void DS18B20Manager::taskTrampoline(void *arg)
 void DS18B20Manager::applyMapping(const uint64_t slotROMs[DS_MAX_SLOTS])
 {
   for (uint16_t i = 0; i < DS_MAX_SLOTS; i++)
-    _slotROM[i] = slotROMs[i];
-  ESP_LOGI(TAG, "%d slots updated", DS_MAX_SLOTS);
+    _slots[i].rom = slotROMs[i];
+  LOGI(TAG, "%d slots updated", DS_MAX_SLOTS);
 }
 
 bool DS18B20Manager::romPresent(uint64_t rom) const
@@ -54,7 +54,7 @@ void DS18B20Manager::busScan()
   {
     if (OneWire::crc8(addr, 7) != addr[7])
     {
-      ESP_LOGW(TAG, "CRC mismatch, discarding a bus reading");
+      LOGW(TAG, "CRC mismatch, discarding a bus reading");
       continue;
     }
     const uint64_t rom = addr_to_rom64(addr);
@@ -63,14 +63,14 @@ void DS18B20Manager::busScan()
       _presentROMs[_presentCount++] = rom;
     }
     else {
-      ESP_LOGE(TAG, "discovered device dropped, MAX_DISC=%u reached", MAX_DISC);
+      LOGE(TAG, "discovered device dropped, MAX_DISC=%u reached", MAX_DISC);
     }
   }
 
   // Retry once if the very first scan races sensor power-up and finds 0
   if (_presentCount == 0)
   {
-    ESP_LOGW(TAG, "nothing found on first pass, retrying after power-up delay");
+    LOGW(TAG, "nothing found on first pass, retrying after power-up delay");
     vTaskDelay(pdMS_TO_TICKS(100));
     _presentCount = 0;
     _oneWire.reset_search();
@@ -79,7 +79,7 @@ void DS18B20Manager::busScan()
     {
       if (OneWire::crc8(addr, 7) != addr[7])
       {
-        ESP_LOGW(TAG, "CRC mismatch, discarding a bus reading");
+        LOGW(TAG, "CRC mismatch, discarding a bus reading");
 
         continue;
       }
@@ -90,19 +90,22 @@ void DS18B20Manager::busScan()
       }
       else
       {
-        ESP_LOGE(TAG, "discovered device dropped, MAX_DISC=%u reached", MAX_DISC);
+        LOGE(TAG, "discovered device dropped, MAX_DISC=%u reached", MAX_DISC);
       }
     }
   }
-  ESP_LOGI(TAG, "busScan -> presentCount=%u", _presentCount);
+  LOGI(TAG, "busScan -> presentCount=%u", _presentCount);
 }
 
 
 int16_t DS18B20Manager::readSlotTemp_x100(uint16_t slot) const
 {
-  if (slot >= DS_MAX_SLOTS)
+  if (slot >= DS_MAX_SLOTS) {
+    LOGE(TAG, "slot=%d out of bounds max=%d", slot, DS_MAX_SLOTS);
     return TEMP_INVALID_SENTINEL;
-  return _slotTemp_x100[slot];
+  }
+//    LOGD(TAG, "slot[%d] val=%d", slot, _slots[slot].temp_x100);
+    return _slots[slot].temp_x100;
 }
 
 
@@ -121,13 +124,38 @@ int16_t DS18B20Manager::readSlotTemp_x100(uint16_t slot) const
     }
   }
 
+  void DS18B20Manager::updateSlot(uint16_t idx, int16_t temp_x100) {
+
+    // Load current slot
+    SlotData &slot = _slots[idx];
+
+    const bool looksLikePowerOn =
+        slot.temp_x100 == TEMP_INVALID_SENTINEL ||
+        abs(slot.temp_x100 - DS_START_TEMP_VALUE) >= DS_START_TEMP_VALUE_SUSPECT_DELTA;
+
+    if (temp_x100 == DS_START_TEMP_VALUE)
+    {
+      // got start-up value, check previous value
+      if (looksLikePowerOn && !slot.suspect85)
+      {
+        // sensor booting up, skip this cycle
+        slot.suspect85 = true;
+        LOGW(TAG, "rejected 85.00C reading, might be startup slot=%d, lastVal=%d", idx, slot.temp_x100);
+        return;
+      }
+    }
+    slot.suspect85 = false;
+    slot.temp_x100 = temp_x100;
+  }
+ 
+
   void DS18B20Manager::taskLoop()
   {
     // Get conversion time for configured resolution
     const TickType_t convTicks = ds18b20ConversionTicks(DS_RESOLUTION_BITS);
     // Evaluate conversion time vs requested scan time - scan time cannot be lower than conversion time.
     const TickType_t period = max(convTicks, pdMS_TO_TICKS(SENSOR_UPDATE_INTERVAL_MS));
-    ESP_LOGI(TAG, "convTicks=%u period=%u (ticks)", convTicks, period);
+    LOGI(TAG, "convTicks=%u period=%u (ticks)", convTicks, period);
 
     while (true)
     {
@@ -141,29 +169,28 @@ int16_t DS18B20Manager::readSlotTemp_x100(uint16_t slot) const
       for (uint16_t i = 0; i < DS_MAX_SLOTS; i++)
       {
         int16_t temp = TEMP_INVALID_SENTINEL;
-        uint64_t rom = _slotROM[i];
 
-        if (romPresent(rom))
+        DeviceAddress a;
+        rom64_to_addr(_slots[i].rom, a);
+        float c = _sensors.getTempC(a);
+
+        if (!isnan(c) && c > -127.0f)
         {
-          DeviceAddress a;
-          rom64_to_addr(rom, a);
-          float c = _sensors.getTempC(a);
-
-          if (!isnan(c) && c > -127.0f)
-          {
-            long vRaw = lroundf(c * 100.0f);
+          long vRaw = lroundf(c * 100.0f);
 
 
-            if (vRaw > 32767)
-              vRaw = 32767;
-            if (vRaw < -32768)
-              vRaw = -32768;
-            temp = (int16_t)vRaw;
-          }
+          if (vRaw > 32767)
+            vRaw = 32767;
+          if (vRaw < -32768)
+            vRaw = -32768;
+          temp = (int16_t)vRaw;
         }
 
-        _slotTemp_x100[i] = temp; // corrected (with offset)
-        ESP_LOGD(TAG, "slot %u: temp=%d", i, temp);
+        // validate if new reading is reasonable
+        // new sensors on bus will report 85.00 before first conversion
+        updateSlot(i, temp);
+
+        LOGD(TAG, "slot %u: temp_x100=%d, suspect85=%x", i, _slots[i].temp_x100, _slots[i].suspect85);
       }
       // Wait remaining time to match SENSOR_UPDATE_INTERVAL_MS
       const TickType_t elapsed = xTaskGetTickCount() - loopStart;

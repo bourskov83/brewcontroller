@@ -42,8 +42,9 @@ static const bool GPIO_ACTIVE_HIGH[] =  {false, false,  false,  true};
 //   ...
 
 // Sentinel for invalid temperature
-#define TEMP_INVALID_SENTINEL      (-32768)
-
+constexpr int16_t TEMP_INVALID_SENTINEL             = -32768;
+constexpr int16_t DS_START_TEMP_VALUE               = 8500; // x100 85.00C before first conversion is complete
+constexpr int16_t DS_START_TEMP_VALUE_SUSPECT_DELTA = 800;   // x100 max. C a sensor can step change before being deemed wrong
 
 // =====================================================================
 // Compile-time sanity checks
@@ -56,3 +57,13 @@ static_assert(DS_MAX_SLOTS > 0 && DS_MAX_SLOTS <= 99,
 
 static_assert(SENSOR_UPDATE_INTERVAL_MS > 0,
               "SENSOR_UPDATE_INTERVAL_MS must be positive");
+
+// =====================================================================
+// Logging workaround for using filters in Arduino framework
+// =====================================================================
+
+#define LOGE(tag, fmt, ...) do { if (esp_log_level_get(tag) >= ESP_LOG_ERROR)   ESP_LOGE(tag, fmt, ##__VA_ARGS__); } while (0)
+#define LOGW(tag, fmt, ...) do { if (esp_log_level_get(tag) >= ESP_LOG_WARN)    ESP_LOGW(tag, fmt, ##__VA_ARGS__); } while (0)
+#define LOGI(tag, fmt, ...) do { if (esp_log_level_get(tag) >= ESP_LOG_INFO)    ESP_LOGI(tag, fmt, ##__VA_ARGS__); } while (0)
+#define LOGD(tag, fmt, ...) do { if (esp_log_level_get(tag) >= ESP_LOG_DEBUG)   ESP_LOGD(tag, fmt, ##__VA_ARGS__); } while (0)
+#define LOGV(tag, fmt, ...) do { if (esp_log_level_get(tag) >= ESP_LOG_VERBOSE) ESP_LOGV(tag, fmt, ##__VA_ARGS__); } while (0)

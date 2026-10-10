@@ -6,6 +6,7 @@
 #include "esp_log.h"
 
 
+
 // DS18B20 Temperature manager class for handling data acquisition from one-wire sensors 
 
 // Utilities to convert between 64-bit ROM and DallasTemperature DeviceAddress.
@@ -48,12 +49,22 @@ public:
   }
   static constexpr uint16_t MAX_DISC = 16;
 
+
 private:
+
+struct SlotData
+  {
+    uint64_t rom = 0;
+    int16_t temp_x100 = TEMP_INVALID_SENTINEL;
+    bool suspect85 = false;
+  };
+
   static void taskTrampoline(void *);
   void taskLoop();
 
   void busScan();
   bool romPresent(uint64_t rom) const;
+  void updateSlot(uint16_t idx, int16_t temp_x100);
 
   OneWire _oneWire;
   DallasTemperature _sensors;
@@ -62,7 +73,9 @@ private:
   uint64_t _presentROMs[MAX_DISC];
   uint16_t _presentCount = 0;
 
+
+
   // Logical ROM mapping
-  uint64_t _slotROM[DS_MAX_SLOTS] = {};
-  int16_t _slotTemp_x100[DS_MAX_SLOTS] = {0};
+//  uint64_t _slotROM[DS_MAX_SLOTS] = {};
+  struct SlotData _slots[DS_MAX_SLOTS];
 };

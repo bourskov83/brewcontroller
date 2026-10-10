@@ -5,7 +5,6 @@
 #include "Managers/GPIOManager.h"
 #include "Managers/SlotConfigManager.h"
 #include "ModbusHandler/ModbusService.h"
-
 #include "esp_log.h"
 
 static const char *TAG = "MAIN";
@@ -17,10 +16,13 @@ SlotConfigManager slotCfg(cfg, dsMgr);
 ModbusService  mbs(dsMgr, gpioMgr, slotCfg);
 
 void setup() {
+  esp_log_level_set("*", ESP_LOG_DEBUG);
+  esp_log_level_set("DS18B20", ESP_LOG_WARN);
+
   Serial.begin(115200);
   delay(200); // delay to stabilize serial as a precaution
   ESP_LOGI(TAG, "serial monitor initialized");
-
+  
   ESP_LOGI(TAG, "init ConfigStore");
   cfg.begin();
 

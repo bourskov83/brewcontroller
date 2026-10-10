@@ -124,7 +124,7 @@ void ModbusService::begin()
         const bool on = (val != 0);                                // FC05 sends 0xFF00 for ON
         _gpio.setOutput(idx, on);                  // your bool-returning setter
         reg->value = on ? 1 : 0;                                   // library stores boolean (0/1)
-        ESP_LOGD(TAG, "coil idx %d updated val=%d", reg, val);
+        ESP_LOGD(TAG, "coil idx %d updated val=%d", idx, val);
         return val;
       },
       NUM_GPIO_OUTPUTS);
@@ -142,6 +142,8 @@ void ModbusService::taskTrampoline(void *arg)
 
 void ModbusService::taskLoop()
 {
+  int16_t count = 0; // count for LOGD output to not overwhelm the console
+
   while (true)
   {
     _mb.task();
@@ -150,15 +152,18 @@ void ModbusService::taskLoop()
     uint16_t pc = _ds.getPresentCount();
 
     _mb.Hreg(REG_SENSOR_COUNT, pc);
-    
     for (uint16_t i = 0; i < REG_TEMPS_COUNT; i++) {
-        int16_t cor = _ds.readSlotTemp_x100(i);
-        _mb.Hreg(REG_TEMPS_BASE + i, (uint16_t)cor);
-    }
+        int16_t temp = _ds.readSlotTemp_x100(i);
+        _mb.Hreg(REG_TEMPS_BASE + i, (uint16_t)temp);
+        if (count == 100) {
+        LOGD(TAG, "temp read from slot=%d _ds=%d",i, temp);
+        }
+      }
     // Mirror Present ROMs (read-only discovery table)
     publishPresentROMs();
 
-
+    count++;
+    if (count > 100){count = 0;}
     vTaskDelay(pdMS_TO_TICKS(10));
   }
 }
