@@ -3,6 +3,10 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
 #include "../config.h"
+#include "esp_log.h"
+#include <atomic>
+
+
 
 // DS18B20 Temperature manager class for handling data acquisition from one-wire sensors 
 
@@ -32,12 +36,13 @@ public:
   // Logical slots
   void applyMapping(const uint64_t slotROMs[DS_MAX_SLOTS]);
 
-  void applyOffsets(const int16_t slotOffsets_x100[DS_MAX_SLOTS]); 
 
   int16_t readSlotTemp_x100(uint16_t slot) const;
-  int16_t readSlotRawTemp_x100(uint16_t slot) const;
 
-  // Present ROMs table (for Modbus discovery)
+  bool requestScan();
+  bool scanDone() const;
+  void clearScanDone();
+
   uint16_t getPresentCount() const { return _presentCount; }
   bool getPresentROM(uint16_t idx, uint64_t &rom) const
   {
@@ -48,12 +53,30 @@ public:
   }
   static constexpr uint16_t MAX_DISC = 16;
 
+
 private:
+
+struct SlotData
+  {
+    uint64_t rom = 0;
+    int16_t temp_x100 = TEMP_INVALID_SENTINEL;
+    bool suspect85 = false;
+  };
+
   static void taskTrampoline(void *);
   void taskLoop();
 
   void busScan();
   bool romPresent(uint64_t rom) const;
+  void updateSlot(uint16_t idx, int16_t temp_x100);
+
+  enum : uint8_t
+  {
+    SCAN_IDLE,
+    SCAN_REQUESTED,
+    SCAN_DONE
+  };
+  std::atomic<uint8_t> _scanState{SCAN_IDLE};
 
   OneWire _oneWire;
   DallasTemperature _sensors;
@@ -62,9 +85,9 @@ private:
   uint64_t _presentROMs[MAX_DISC];
   uint16_t _presentCount = 0;
 
+
+
   // Logical ROM mapping
-  uint64_t _slotROM[DS_MAX_SLOTS] = {};
-  int16_t _slotOffset_x100[DS_MAX_SLOTS] = {0};
-  int16_t _slotRawTemp_x100[DS_MAX_SLOTS] = {0}; 
-  int16_t _slotTemp_x100[DS_MAX_SLOTS] = {0};
+//  uint64_t _slotROM[DS_MAX_SLOTS] = {};
+  struct SlotData _slots[DS_MAX_SLOTS];
 };

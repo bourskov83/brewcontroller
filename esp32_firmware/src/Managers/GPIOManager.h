@@ -1,6 +1,7 @@
 #pragma once
 #include <Arduino.h>
 #include "../config.h"
+#include "esp_log.h"
 
 // GPIOManager class for handling digital input / oututs
 

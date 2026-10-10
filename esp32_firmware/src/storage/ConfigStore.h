@@ -36,29 +36,6 @@ public:
     _prefs.putBytes(key, &rom, 8);
   }
 
-  // ---- New: per-slot offset (int16, °C x100) ----
-  bool loadOffset(uint16_t slot, int16_t &offset_x100)
-  {
-    char key[8];
-    snprintf(key, sizeof(key), "o%02u", slot);
-    size_t got = _prefs.getBytesLength(key);
-    if (got != 2)
-    {
-      offset_x100 = 0;
-      return false;
-    }
-    int16_t tmp = 0;
-    _prefs.getBytes(key, &tmp, 2);
-    offset_x100 = tmp;
-    return true;
-  }
-
-  void saveOffset(uint16_t slot, int16_t offset_x100)
-  {
-    char key[8];
-    snprintf(key, sizeof(key), "o%02u", slot);
-    _prefs.putBytes(key, &offset_x100, 2);
-  }
 
   void clearAll()
   {
