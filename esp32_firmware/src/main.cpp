@@ -16,35 +16,33 @@ SlotConfigManager slotCfg(cfg, dsMgr);
 ModbusService  mbs(dsMgr, gpioMgr, slotCfg);
 
 void setup() {
-  esp_log_level_set("*", ESP_LOG_DEBUG);
-  esp_log_level_set("DS18B20", ESP_LOG_WARN);
 
   Serial.begin(115200);
   delay(200); // delay to stabilize serial as a precaution
-  ESP_LOGI(TAG, "serial monitor initialized");
+  LOGI(TAG, "serial monitor initialized");
   
-  ESP_LOGI(TAG, "init ConfigStore");
+  LOGI(TAG, "init ConfigStore");
   cfg.begin();
 
-  ESP_LOGI(TAG, "init GPIOManager");
+  LOGI(TAG, "init GPIOManager");
   gpioMgr.begin();
 
 
   
-  ESP_LOGI(TAG, "init DS18B20Manager");
+  LOGI(TAG, "init DS18B20Manager");
   dsMgr.begin();
 
-  ESP_LOGI(TAG, "init SlotConfigManager");
+  LOGI(TAG, "init SlotConfigManager");
   slotCfg.begin();
 
-  ESP_LOGI(TAG, "DS18B20Manager: startTask");
+  LOGI(TAG, "DS18B20Manager: startTask");
   dsMgr.startTask(1, 4096, 0);
 
-  ESP_LOGI(TAG, "init ModbusService");
+  LOGI(TAG, "init ModbusService");
   mbs.begin();
   mbs.startTask(2, 4096, 1);
 
-  ESP_LOGI(TAG, "init sequence complete");
+  LOGI(TAG, "init sequence complete");
 }
 
 void loop() {

@@ -42,7 +42,7 @@ class SensorIO:
     """
 
     def __init__(self, rtu, store: SensorStore, sensor_map: List[SensorMapping],
-                 temp_base_addr: int = 30, temp_count: int = 8):
+                 temp_base_addr: int = 10, temp_count: int = 8):
         self.rtu = rtu
         self.store = store
         self.sensor_map = sensor_map

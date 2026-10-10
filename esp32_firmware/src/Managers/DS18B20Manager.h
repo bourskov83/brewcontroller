@@ -4,6 +4,7 @@
 #include <DallasTemperature.h>
 #include "../config.h"
 #include "esp_log.h"
+#include <atomic>
 
 
 
@@ -38,7 +39,10 @@ public:
 
   int16_t readSlotTemp_x100(uint16_t slot) const;
 
-  // Present ROMs table (for Modbus discovery)
+  bool requestScan();
+  bool scanDone() const;
+  void clearScanDone();
+
   uint16_t getPresentCount() const { return _presentCount; }
   bool getPresentROM(uint16_t idx, uint64_t &rom) const
   {
@@ -65,6 +69,14 @@ struct SlotData
   void busScan();
   bool romPresent(uint64_t rom) const;
   void updateSlot(uint16_t idx, int16_t temp_x100);
+
+  enum : uint8_t
+  {
+    SCAN_IDLE,
+    SCAN_REQUESTED,
+    SCAN_DONE
+  };
+  std::atomic<uint8_t> _scanState{SCAN_IDLE};
 
   OneWire _oneWire;
   DallasTemperature _sensors;

@@ -14,7 +14,7 @@ SlotConfigManager::SlotConfigManager(
 void SlotConfigManager::begin() {
     loadAll();
     applyROMs();
-    ESP_LOGD(TAG, "loaded and applied");
+    LOGD(TAG, "loaded and applied");
 }
 
 void SlotConfigManager::loadAll() {
@@ -26,7 +26,7 @@ void SlotConfigManager::loadAll() {
         _slotROMs[i] = rom;
 
     }
-    ESP_LOGI(TAG, "loaded %d slots from NVS", DS_MAX_SLOTS);
+    LOGI(TAG, "loaded %d slots from NVS", DS_MAX_SLOTS);
 };
 
 void SlotConfigManager::clearAll() {
@@ -34,12 +34,12 @@ void SlotConfigManager::clearAll() {
         _slotROMs[i] = 0;
     }
     commit();
-    ESP_LOGI(TAG, "zeroing all slot roms");
+    LOGI(TAG, "zeroing all slot roms");
 }
 
 uint64_t SlotConfigManager::getROM(uint16_t slot) const {
     if (slot >= DS_MAX_SLOTS) {
-        ESP_LOGE(TAG, "slot out of bounds! slot=%d, max_slot=%d", slot, DS_MAX_SLOTS);
+        LOGE(TAG, "slot out of bounds! slot=%d, max_slot=%d", slot, DS_MAX_SLOTS);
         return 0;
     }
 
@@ -48,11 +48,11 @@ uint64_t SlotConfigManager::getROM(uint16_t slot) const {
 
 void SlotConfigManager::setROM(uint16_t slot, uint64_t rom) {
     if (slot >= DS_MAX_SLOTS) {
-        ESP_LOGE(TAG, "slot out of bounds! slot=%d, max_slot=%d", slot, DS_MAX_SLOTS);
+        LOGE(TAG, "slot out of bounds! slot=%d, max_slot=%d", slot, DS_MAX_SLOTS);
         return;
     }
     _slotROMs[slot] = rom;
-    ESP_LOGD(TAG, "slot=%u rom=%016" PRIX64, slot, rom);
+    LOGD(TAG, "slot=%u rom=%016" PRIX64, slot, rom);
 }
 
 void SlotConfigManager::commit() {
@@ -60,18 +60,18 @@ void SlotConfigManager::commit() {
         saveROM(i, _slotROMs[i]);
     }
     applyROMs();
-    ESP_LOGI(TAG, "saved %d slots", DS_MAX_SLOTS);
+    LOGI(TAG, "saved %d slots", DS_MAX_SLOTS);
 }
 
 void SlotConfigManager::saveROM(uint16_t slot, uint64_t rom) {
     // carry over slot,rom mapping to ConfigStore
     _cfg.saveROM(slot, rom);
-    ESP_LOGD(TAG, "slot=%u rom=%016" PRIX64, slot, rom);
+    LOGD(TAG, "slot=%u rom=%016" PRIX64, slot, rom);
 }
 
 
 
 void SlotConfigManager::applyROMs() {
     _ds.applyMapping(_slotROMs);
-    ESP_LOGD(TAG, "apply to _ds instance");
+    LOGD(TAG, "apply to _ds instance");
 }

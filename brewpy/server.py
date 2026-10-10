@@ -1,7 +1,6 @@
-#!/usr/bin/env python3
+
 import asyncio
 from logger_config import log
-
 from pymodbus import FramerType
 from pymodbus.server import StartAsyncTcpServer
 from pymodbus.datastore import (

@@ -43,6 +43,17 @@ bool DS18B20Manager::romPresent(uint64_t rom) const
   return false;
 }
 
+bool DS18B20Manager::requestScan()
+{
+  uint8_t expected = SCAN_IDLE;
+  // only succeeds if idle, so a second request while busy is refused
+  return _scanState.compare_exchange_strong(expected, SCAN_REQUESTED);
+}
+
+bool DS18B20Manager::scanDone() const { return _scanState == SCAN_DONE; }
+
+void DS18B20Manager::clearScanDone() { _scanState = SCAN_IDLE; }
+
 void DS18B20Manager::busScan()
 {
   // First attempt
@@ -192,6 +203,14 @@ int16_t DS18B20Manager::readSlotTemp_x100(uint16_t slot) const
 
         LOGD(TAG, "slot %u: temp_x100=%d, suspect85=%x", i, _slots[i].temp_x100, _slots[i].suspect85);
       }
+
+      if (_scanState == SCAN_REQUESTED) // do a bus scan
+      {
+        LOGD(TAG, "requested 1-wire bus scan");
+        busScan();
+        _scanState = SCAN_DONE;
+      }
+
       // Wait remaining time to match SENSOR_UPDATE_INTERVAL_MS
       const TickType_t elapsed = xTaskGetTickCount() - loopStart;
       if (elapsed < period)

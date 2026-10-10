@@ -26,11 +26,12 @@ private:
   uint64_t getSlotROM_fromHR(uint16_t slot);
 
   void setSlotROM_intoHR(uint16_t slot, uint64_t rom);
-
+  void setupLogRegisters();
   // Helpers for Present ROMs table (read-only mirror)
   void publishPresentROMs();
   void refreshRomHRs();
-  
+  uint16_t handleSlotCmd(uint16_t cmd);
+  void setSlotStatus(uint16_t status);
   DS18B20Manager &_ds;
   GPIOManager &_gpio;
   SlotConfigManager &_slotCfg;
