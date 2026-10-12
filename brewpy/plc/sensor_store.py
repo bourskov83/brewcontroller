@@ -2,6 +2,7 @@ import asyncio
 import time
 from dataclasses import dataclass
 from enum import Enum
+from logger_config import log
 
 class SensorStatus(Enum):
     OK = 0

@@ -1,7 +1,7 @@
 """
-Top-level SoftPLC: owns shared state (tags, PID, RTU client) and wires
+Top-level SoftPLC: owns shared state (tags, , RTU client) and wires
 together the three background tasks. The actual task logic now lives in
-plc/scan.py, plc/bridge.py, and plc/sensors.py — this class is just
+plc/scan.py, plc/bridge.py, and plc/sensors.py — this lass is just
 construction + lifecycle (start/stop).
 """
 import asyncio
@@ -11,8 +11,6 @@ from tagmap import Tags, load_tags
 from pymodbus.datastore import ModbusServerContext
 
 from modbus_rtu_client import AsyncModbusRTUClient
-from pid_control import CascadePIDController
-from output_control import SSRController
 
 from plc.sensors import SensorIO
 from plc.scan import ScanTask
@@ -31,16 +29,11 @@ class SoftPLC:
         self.tags = Tags(store=context[0x00], mapping=self._tagmap)
         
 
-        self.pid = CascadePIDController()
-        self.ssr = SSRController(cycle_time=4.0)
-
-
         self._sensormap = load_sensor_map(sensor_map_file)
         self.sensor_store = SensorStore()
         self.sensors = SensorIO(rtu=self.rtu, store=self.sensor_store, sensor_map=self._sensormap)
-        self.scan_task = ScanTask(tags=self.tags, rtu=self.rtu, pid=self.pid, ssr=self.ssr,
-                                   store=self.sensor_store)
-        self.bridge_task = BridgeTask(tags=self.tags, pid=self.pid, scan_task=self.scan_task)
+        self.scan_task = ScanTask(tags=self.tags, rtu=self.rtu, store=self.sensor_store)
+        self.bridge_task = BridgeTask(tags=self.tags, scan_task=self.scan_task)
         self.bridge_task.attach_sensors(self.sensors)
 
         self._tasks: list[asyncio.Task] = []

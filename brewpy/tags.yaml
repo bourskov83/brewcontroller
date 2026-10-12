@@ -8,31 +8,10 @@
 mlt_pump:         { table: 1, address: 0}
 hlt_pump:         { table: 1, address: 1}
 bk_pump:          { table: 1, address: 2}
-hlt_heater_state: { table: 1, address: 3}
-mlt_pid_auto:     { table: 1, address: 4}
-hlt_pid_auto:     { table: 1, address: 5}
-mlt_pid_save:     { table: 1, address: 6}
-hlt_pid_save:     { table: 1, address: 7}
-write_offsets:    { table: 1, address: 27}
-read_offsets:     { table: 1, address: 28}
-write_roms:       { table: 1, address: 29}
-read_roms:        { table: 1, address: 30}
 
 
 
 # Holding registers
-mlt_sp:                     { table: 3, address: 0  }              
-mlt_pv:                     { table: 3, address: 1  }              
-mlt_heater_output:          { table: 3, address: 2  }
-mlt_pid_Kp:                 { table: 3, address: 3  }
-mlt_pid_Ki:                 { table: 3, address: 4  }
-mlt_pid_Kd:                 { table: 3, address: 5  }
-hlt_sp:                     { table: 3, address: 6  }
-hlt_pv:                     { table: 3, address: 7  } 
-hlt_heater_output:          { table: 3, address: 8  }
-hlt_pid_Kp:                 { table: 3, address: 9  }
-hlt_pid_Ki:                 { table: 3, address: 10 }
-hlt_pid_Kd:                 { table: 3, address: 11 }
 hlt_temp_roc:               { table: 3, address: 16 }
 mlt_temp_roc:               { table: 3, address: 17 }
 bk_temp_roc:                { table: 3, address: 18 }
