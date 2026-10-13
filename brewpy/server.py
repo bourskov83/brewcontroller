@@ -10,42 +10,29 @@ from pymodbus.datastore import (
 )
 from pymodbus import ModbusDeviceIdentification
 from plc import SoftPLC
+from tagmap import table_sizes
+from check_config import load_all, validate_or_raise
 from modbus_rtu_client import ModbusRTUClient,AsyncModbusRTUClient
-import os
-
-# --------------------------------------------------------
-# Environment variables
-# --------------------------------------------------------
-
-MODBUS_RTU_PORT     = os.getenv("MODBUS_RTU_PORT")
-MODBUS_RTU_BAUD     = os.getenv("MODBUS_RTU_BAUD", 38400)
-MODBUS_RTU_PARITY   = os.getenv("MODBUS_RTU_PARITY", "N")
-MODBUS_RTU_STOPBIT  = os.getenv("MODBUS_RTU_STOPBIT", 1)
-MODBUS_RTU_BYTESIZE = os.getenv("MODBUS_RTU_BYTESIZE", 8)
-MODBUS_RTU_TIMEOUT  = os.getenv("MODBUS_RTU_TIMEOUT", 0.3)
 
 
 # --------------------------------------------------------
 # DATASTORE BACKING (classic Modbus memory model)
 # --------------------------------------------------------
 
-def build_datastore():
+def build_datastore(tag_defs):
     """
-    Build the datastore the classic way with ModbusDeviceContext.
-    Tables:
-      di (discrete inputs), co (coils), ir (input regs), hr (holding regs)
+    Build the datastore from tags.yaml: every table is exactly as large as its
+    highest tag address needs (minimum 32 entries).
+
+    Blocks START AT 1: pymodbus adds 1 to every address internally, so a block
+    that starts at 0 is one entry short and the highest tag would silently fail.
     """
-    # Coils: 
-    coils = ModbusSequentialDataBlock(0, [0]*32)
+    n = table_sizes(tag_defs, minimum=32)
 
-    # Discrete inputs: 0
-    discrete_inputs = ModbusSequentialDataBlock(0, [0])
-
-    # Input registers: 
-    input_registers = ModbusSequentialDataBlock(0, [0]*32)
-
-    # Holding registers: 
-    holding_registers = ModbusSequentialDataBlock(0, [0]*256)
+    coils = ModbusSequentialDataBlock(1, [False] * n["coil"])
+    discrete_inputs = ModbusSequentialDataBlock(1, [0] * n["di"])
+    input_registers = ModbusSequentialDataBlock(1, [0] * n["ir"])
+    holding_registers = ModbusSequentialDataBlock(1, [0] * n["hr"])
 
     # NOTE: In 3.10+ use ModbusDeviceContext (not ModbusSlaveContext)
     device_ctx = ModbusDeviceContext(
@@ -62,7 +49,10 @@ def build_datastore():
 # --------------------------------------------------------
 
 async def main():
-    context = build_datastore()
+    # tags.yaml + esp32.yaml + sensors.yaml: load once, cross-check, then share
+    tag_defs, device, sensor_map = load_all()
+    validate_or_raise(tag_defs, device, sensor_map, log)   # a bad config stops the boot here
+    context = build_datastore(tag_defs)
 
     identity = ModbusDeviceIdentification(
         info_name={
@@ -74,12 +64,12 @@ async def main():
     )
     try:
         rtu_sync = ModbusRTUClient(
-            port=MODBUS_RTU_PORT,
-            baudrate=MODBUS_RTU_BAUD,
-            parity=MODBUS_RTU_PARITY,
-            stopbits=MODBUS_RTU_STOPBIT,
-            bytesize=MODBUS_RTU_BYTESIZE,
-            timeout=MODBUS_RTU_TIMEOUT,
+            port=device.link.port,
+            baudrate=device.link.baud,
+            parity="N",
+            stopbits=1,
+            bytesize=8,
+            timeout=device.link.timeout,
         )
     except:
         rtu_sync = None
@@ -89,7 +79,7 @@ async def main():
     log.info("RTU serial connected")
 
 
-    plc = SoftPLC(context, async_rtu)
+    plc = SoftPLC(context, async_rtu, tag_defs, device, sensor_map)
     await plc.start()
 
 

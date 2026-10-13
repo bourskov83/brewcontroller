@@ -5,7 +5,6 @@ The tag IS the sensor's name: "hlt_temp" in sensors.yaml is the same
 "hlt_temp" in tags.yaml, in FUXA, in the logs and in SensorStore.
 """
 from dataclasses import dataclass
-from typing import List
 
 from yamlutil import load_yaml
 
@@ -24,11 +23,11 @@ class SensorMapping:
         return f"{self.tag}_roc"
 
 
-def load_sensor_map(filename: str = "sensors.yaml") -> List[SensorMapping]:
+def load_sensor_map(filename: str = "sensors.yaml") -> list[SensorMapping]:
     """Read sensors.yaml into a list of SensorMapping, sorted by slot."""
     sensor_list = load_yaml(filename)
     if not isinstance(sensor_list, list):
-        raise ValueError(f"{filename}: expected a list of sensors")
+        raise TypeError(f"{filename}: expected a list of sensors")
 
     sensors = []
     for row in sensor_list:

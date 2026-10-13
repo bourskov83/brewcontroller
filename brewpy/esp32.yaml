@@ -11,7 +11,7 @@
 device: esp32-gateway
 
 link:
-  port: /dev/cu.usbserial-A50285BI     # --port on sensor_config.py overrides this
+  port: /dev/ttyAMA2                   # --port on sensor_config.py overrides this
   baud: 38400                          # must match MODBUS_BAUD in config.h
   device_id: 1                         # pymodbus' default; confirm against the firmware's slave id
   timeout: 0.3                         # seconds, per serial request
