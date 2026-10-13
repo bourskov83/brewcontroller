@@ -73,6 +73,7 @@ class ScanTask:
             t0 = loop.time()
 
             await self._update_sensor_readings()
+            
             await self._update_coils()
 
             # iterate over syncronoush calls            
@@ -102,7 +103,7 @@ class ScanTask:
         the sentinel; the loss is instead visible via sensor_fault_word.
         """
         try:
-            readings = await self.store.get_all()
+            readings = await self.store.snapshot()
             fault_word = 0
                 
             for m in self._sensor_map:
@@ -110,6 +111,7 @@ class ScanTask:
                 if reading is None or reading.status != SensorStatus.OK:
                     # Not yet published (startup) or FAULT: flag it, leave the
                     # tag frozen at its last good value.
+                    log.error(f"sensor {reading} status={reading.status}" )
                     fault_word |= (1 << m.slot)
                     continue
                 self.tags.set_raw(m.tag, reading.value)

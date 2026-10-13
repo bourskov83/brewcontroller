@@ -31,6 +31,7 @@ class Temperatures:
     count: int
     scale: int
     invalid: int
+    stale_after_s: int
 
 
 @dataclass(frozen=True)

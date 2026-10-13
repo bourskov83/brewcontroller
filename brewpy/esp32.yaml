@@ -24,6 +24,7 @@ inputs:
     count: 8               # registers read per poll (slots 0..7)
     scale: 100             # register = degC x 100, signed int16
     invalid: -32768        # sentinel the firmware writes when a slot has no reading
+    stale_after_s: 3       # seconds to make a input go stale if not updated.
     # Which sensor sits in which slot, and which tag it feeds: sensors.yaml
 
 

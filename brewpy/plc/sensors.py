@@ -76,7 +76,3 @@ class SensorIO:
 
         except Exception as e:
             log.error(e)
-    # ------------------------------------------------------------------
-    # ROM table (sensor identity) management
-    # ------------------------------------------------------------------
-

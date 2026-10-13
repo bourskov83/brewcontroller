@@ -19,7 +19,7 @@ class SoftPLC:
     def __init__(self, context, rtu, tag_defs, device, sensor_map):
         self.device = device
         self.tags = Tags(store=context[0x00], tags=tag_defs)
-        self.sensor_store = SensorStore()
+        self.sensor_store = SensorStore(stale_after_s=device.temps.stale_after_s)
         self.sensors = SensorIO(rtu, self.sensor_store, sensor_map, device)
         self.scan_task = ScanTask(self.tags, rtu, self.sensor_store, sensor_map, device)
         self.bridge_task = BridgeTask(self.tags)
