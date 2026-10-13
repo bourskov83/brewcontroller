@@ -1,55 +1,76 @@
-#tables:
-#  CO: 1
-#  DI: 2
-#  HR: 3
-#  IR: 4
+# tags.yaml  -  the PLC datastore, i.e. the contract with FUXA (Modbus TCP).
+#
+# This file says what each address in the PLC's own memory MEANS. It says
+# nothing about the ESP32: where a value comes from / goes to on the RTU side
+# lives in esp32.yaml (+ sensors.yaml). Run `python check_config.py` to see
+# the full path of every tag in one table.
+#
+# Fields
+#   table  coil | di | hr | ir     (coil = FC1, di = FC2, hr = FC3, ir = FC4)
+#   addr   address inside that table (unchanged from the old file, so FUXA
+#          keeps working without edits)
+#   dtype  bool | int16 | uint16
+#   scale  register value = engineering value x scale   (default 1)
+#          temps are degC x100, so 6523 in the register = 65.23 degC
+#   owner  plc = only the PLC writes it      hmi = only FUXA writes it
+#
+# Names starting with "_" are YAML templates, not tags.
 
-# Coils
-mlt_pump:         { table: 1, address: 0}
-hlt_pump:         { table: 1, address: 1}
-bk_pump:          { table: 1, address: 2}
-
-
-
-# Holding registers
-hlt_temp_roc:               { table: 3, address: 16 }
-mlt_temp_roc:               { table: 3, address: 17 }
-bk_temp_roc:                { table: 3, address: 18 }
-chill_outlet_temp_roc:      { table: 3, address: 19 }
-mlt_temp_offset:            { table: 3, address: 20 }
-mlt_inlet_temp_offset:      { table: 3, address: 21 }
-mlt_outlet_temp_offset:     { table: 3, address: 22 }
-hlt_temp_offset:            { table: 3, address: 23 }
-mash_target_temp:           { table: 3, address: 30 }
-mash_target_delta:          { table: 3, address: 31 }
-sparge_target_temp:         { table: 3, address: 32 }
-sparge_target_delta:        { table: 3, address: 33 }
-chill_target_temp:          { table: 3, address: 34 }    
-chill_target_delta:         { table: 3, address: 35 }   
-sensor_fault_word:          { table: 3, address: 36 }
-pitch_target_temp:          { table: 3, address: 37 } 
-pitch_target_delta:         { table: 3, address: 38 }
-chill_delta:                { table: 3, address: 39 }
-chill_max_wort_delta:       { table: 3, address: 40 }
-chill_effective_ratio:      { table: 3, address: 41 }
+_temp:   &temp   { table: ir, dtype: int16, scale: 100, unit: C,     owner: plc }
+_roc:    &roc    { table: hr, dtype: int16, scale: 100, unit: C/min, owner: plc }
+_delta:  &delta  { table: hr, dtype: int16, scale: 100, unit: C,     owner: plc }
+_target: &target { table: hr, dtype: int16, scale: 100, unit: C,     owner: hmi }
+_cmd:    &cmd    { table: coil, dtype: bool, owner: hmi }
 
 
-# Input registers
-mlt_temp:               { table: 4, address: 0 }
-mlt_inlet_temp:         { table: 4, address: 1 }
-mlt_outlet_temp:        { table: 4, address: 2 }
-hlt_temp:               { table: 4, address: 3 } 
-hlt_inlet_temp:         { table: 4, address: 4 }
-bk_temp:                { table: 4, address: 5 }
-bk_outlet_temp:         { table: 4, address: 6 } 
-mlt_temp_raw:           { table: 4, address: 10 }
-mlt_inlet_temp_raw:     { table: 4, address: 11 }
-mlt_outlet_temp_raw:    { table: 4, address: 12 }
-hlt_temp_raw:           { table: 4, address: 13 } 
-hlt_inlet_temp_raw:     { table: 4, address: 14 }
-bk_temp_raw:            { table: 4, address: 15 }
-bk_outlet_temp_raw:     { table: 4, address: 16 }
-chill_inlet_temp:       { table: 4, address: 17 }
-chill_inlet_temp_raw:   { table: 4, address: 18 }
-chill_outlet_temp:      { table: 4, address: 19 }
-chill_outlet_temp_raw:  { table: 4, address: 20 }
+# --- Commands from the HMI (pass-through to the ESP32 relays) -------------
+# Which ESP32 coil each one drives is defined in esp32.yaml, not here.
+mlt_pump:  { <<: *cmd, addr: 0 }
+hlt_pump:  { <<: *cmd, addr: 1 }
+bk_pump:   { <<: *cmd, addr: 2 }
+
+
+# --- Temperatures, written by the PLC from the sensors (see sensors.yaml) -
+# Value = degC x100, signed. Frozen at the last good value while the sensor
+# is faulted; the fault itself shows up in sensor_fault_word.
+mlt_temp:          { <<: *temp, addr: 0 }
+mlt_inlet_temp:    { <<: *temp, addr: 1 }
+mlt_outlet_temp:   { <<: *temp, addr: 2 }
+hlt_temp:          { <<: *temp, addr: 3 }
+bk_temp:           { <<: *temp, addr: 5 }
+bk_outlet_temp:    { <<: *temp, addr: 6 }
+# NOTE: the chiller sensors sit at 17 / 19 because the old *_raw tags used the
+# addresses in between. Repacking to 7 / 8 is a separate step (it needs the
+# FUXA tag bindings updated at the same time).
+chill_inlet_temp:  { <<: *temp, addr: 17 }
+chill_outlet_temp: { <<: *temp, addr: 19 }
+
+
+# --- Rate of change, computed by the PLC (degC per minute x100) -----------
+# One per sensor that has roc_enabled: true in sensors.yaml. The name must be
+# <sensor tag>_roc.
+hlt_temp_roc:          { <<: *roc, addr: 16 }
+mlt_temp_roc:          { <<: *roc, addr: 17 }
+bk_temp_roc:           { <<: *roc, addr: 18 }
+chill_outlet_temp_roc: { <<: *roc, addr: 19 }
+
+
+# --- Setpoints, written by the HMI ----------------------------------------
+# 0 means "no target set"; the delta tags below then stay at 0.
+mash_target_temp:    { <<: *target, addr: 30 }
+sparge_target_temp:  { <<: *target, addr: 32 }
+pitch_target_temp:   { <<: *target, addr: 37 }
+
+
+# --- Deltas and chiller metrics, computed by the PLC ----------------------
+mash_target_delta:    { <<: *delta, addr: 31 }     # mlt   - mash target
+sparge_target_delta:  { <<: *delta, addr: 33 }     # hlt   - sparge target
+pitch_target_delta:   { <<: *delta, addr: 38 }     # bk    - pitch target
+chill_delta:          { <<: *delta, addr: 39 }     # chill_inlet - chill_outlet
+chill_max_wort_delta: { <<: *delta, addr: 40 }     # chill_inlet - bk
+chill_effective_ratio: { table: hr, dtype: int16, scale: 100, unit: ratio, owner: plc, addr: 41 }
+
+# One bit per ESP32 slot: bit n set = sensor in slot n is missing or faulted.
+sensor_fault_word:    { table: hr, dtype: uint16, owner: plc, addr: 36 }
+
+

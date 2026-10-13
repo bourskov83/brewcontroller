@@ -1,0 +1,61 @@
+# esp32.yaml  -  the ESP32 gateway as the PLC sees it (Modbus RTU).
+#
+# Everything here mirrors esp32_firmware/src/config.h. It is the ONE place on
+# the Python side that knows an ESP32 register number. If the firmware changes
+# (or the ESP32 is swapped for a real I/O module), this is the file to change;
+# tags.yaml and FUXA stay as they are.
+#
+# This file is about device I/O points. PLC tag names only appear in the
+# `outputs` section, which says which tag drives which coil.
+
+device: esp32-gateway
+
+link:
+  port: /dev/cu.usbserial-A50285BI     # --port on sensor_config.py overrides this
+  baud: 38400                          # must match MODBUS_BAUD in config.h
+  device_id: 1                         # pymodbus' default; confirm against the firmware's slave id
+  timeout: 0.3                         # seconds, per serial request
+
+
+# --- Inputs: what the PLC reads from the ESP32 ------------------------------
+inputs:
+  temperatures:
+    hreg_base: 10          # slot n is read from holding register hreg_base + n
+    count: 8               # registers read per poll (slots 0..7)
+    scale: 100             # register = degC x 100, signed int16
+    invalid: -32768        # sentinel the firmware writes when a slot has no reading
+    # Which sensor sits in which slot, and which tag it feeds: sensors.yaml
+
+
+# --- Outputs: what the PLC writes to the ESP32 ------------------------------
+# ESP32 coil address -> PLC tag that drives it. The PLC writes this block in
+# one request, so the addresses must be contiguous from 0.
+outputs:
+  coils:
+    0: mlt_pump
+    1: hlt_pump
+    2: bk_pump
+
+
+# --- Commissioning / maintenance interface (sensor_config.py) ---------------
+commissioning:
+  max_slots: 10            # DS_MAX_SLOTS
+  max_disc: 16             # DS18B20Manager::MAX_DISC
+  rom_reg_stride: 4        # 4 x 16-bit regs per 64-bit ROM
+  rom_config_base: 100     # 100..139: ROM table, max_slots x stride regs (write, then APPLY_MAPPING)
+  slot_cmd: 200            # PLC writes a command code, firmware clears it on accept
+  slot_cmd_status: 201     # firmware writes the status below
+  present_count: 300       # valid after a SCAN reported done
+  present_roms: 301        # 301.., max_disc x stride regs, valid after a SCAN reported done
+  log_level_all: 210       # writing sets every tag (0 none .. 5 verbose)
+  log_level_base: 211      # 211 + index in log_tags
+  log_tags: [MAIN, CFGSTR, SLOTCFG, DS18B20, GPIO, MODBUS]   # order = LOG_TAGS in config.h
+  commands:
+    scan: 0x0001           # rescan the 1-Wire bus, refresh the discovery table
+    apply_mapping: 0xA5A5  # commit the staged ROM table to NVS and rebind
+    clear_config: 0xC1EA   # zero all slot ROMs and commit
+  status:
+    idle: 0
+    busy: 1
+    done: 2
+    error: 3

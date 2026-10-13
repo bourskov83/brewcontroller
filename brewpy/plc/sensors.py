@@ -86,13 +86,13 @@ class SensorIO:
                 if raw == TEMP_INVALID_SENTINEL:
                     # ESP32 has no reading for this slot right now (sensor
                     # missing / not yet discovered / CRC failure on the bus).
-                    await self.store.update(m.sensor, None, SensorStatus.FAULT)
+                    await self.store.update(m.tag, None, SensorStatus.FAULT)
                     continue
 
                 # Apply sensor calibration offset before publishing (still
                 # in signed degC x100 register space).
                 corrected_temp = raw + float_to_reg(m.offset)[0]
-                await self.store.update(m.sensor, corrected_temp, SensorStatus.OK)
+                await self.store.update(m.tag, corrected_temp, SensorStatus.OK)
 
         except Exception as e:
             log.error(e)

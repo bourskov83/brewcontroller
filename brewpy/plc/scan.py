@@ -108,13 +108,13 @@ class ScanTask:
             fault_word = 0
                 
             for m in self._sensor_map:
-                reading = readings.get(m.sensor)
+                reading = readings.get(m.tag)
                 if reading is None or reading.status != SensorStatus.OK:
                     # Not yet published (startup) or FAULT: flag it, leave the
                     # tag frozen at its last good value.
                     fault_word |= (1 << m.slot)
                     continue
-                self.tags.write(f"{m.sensor}_temp", int(reading.value))
+                self.tags.write(f"{m.tag}", int(reading.value))
 
             self.tags.write("sensor_fault_word", fault_word)
         except Exception:

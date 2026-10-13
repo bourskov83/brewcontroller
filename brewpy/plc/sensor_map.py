@@ -1,40 +1,41 @@
 """
-Mapping of sensor roms, offsets etc.
+Mapping of physical sensors to ESP32 slots and PLC tags (sensors.yaml).
+
+The tag IS the sensor's name: "hlt_temp" in sensors.yaml is the same
+"hlt_temp" in tags.yaml, in FUXA, in the logs and in SensorStore.
 """
-
-import yaml
-
-
 from dataclasses import dataclass
 from typing import List
+
+from yamlutil import load_yaml
 
 
 @dataclass
 class SensorMapping:
-    """One row of sensor_map.yaml: which physical sensor lives in which slot."""
-    sensor: str                 # tag-name prefix, e.g. "mlt_temp"
-    slot: int                   # channel index in the RTU's sensor table
+    """One row of sensors.yaml."""
+    tag: str                    # tags.yaml tag AND the sensor's name, e.g. "mlt_temp"
+    slot: int                   # channel index on the ESP32 (hreg = hreg_base + slot)
     rom: str                    # DS18B20 ROM code as "28-8C-63-..." hex string
-    roc_enabled: bool = False   # Enable/Disable Rate of Change tracking for the sensor
-    offset: float = 0.0         # calibration offset in engineering units
+    roc_enabled: bool = False   # also track rate of change -> tag "<tag>_roc"
+    offset: float = 0.0         # calibration offset in degC
+
+    @property
+    def roc_tag(self) -> str:
+        return f"{self.tag}_roc"
 
 
+def load_sensor_map(filename: str = "sensors.yaml") -> List[SensorMapping]:
+    """Read sensors.yaml into a list of SensorMapping, sorted by slot."""
+    sensor_list = load_yaml(filename)
+    if not isinstance(sensor_list, list):
+        raise ValueError(f"{filename}: expected a list of sensors")
 
-
-def load_sensor_map(filename : str = "sensors.yaml") -> List[SensorMapping]:
-    """
-    Reads yaml config file for sensors and map to list of sensors
-    """
-    with open(filename, "r") as sensors_file:
-        sensor_list = yaml.safe_load(sensors_file)
-
-    sensors =  []
+    sensors = []
     for row in sensor_list:
         try:
-            s = SensorMapping(**row) # unpack dict to SensorMapping
+            s = SensorMapping(**row)
         except TypeError as e:
-            raise ValueError(f"Error unpacking sensor mapping for {row}") from e
+            raise ValueError(f"{filename}: bad sensor row {row}: {e}") from e
         sensors.append(s)
     sensors.sort(key=lambda m: m.slot)
     return sensors
-

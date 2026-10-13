@@ -1,39 +1,52 @@
-- sensor: mlt
+# sensors.yaml  -  which physical DS18B20 sits in which ESP32 slot.
+#
+#   tag          the sensor's name AND the tags.yaml tag that receives its
+#                corrected temperature (one name, used everywhere)
+#   slot         ESP32 channel; the PLC reads it from hreg (hreg_base + slot),
+#                see esp32.yaml
+#   rom          DS18B20 ROM code; sensor_config.py pushes it into the slot
+#   offset       calibration offset in degC, applied by the PLC (the ESP32
+#                stays raw I/O)
+#   roc_enabled  also track rate of change -> writes the tag "<tag>_roc"
+#
+# `python check_config.py` verifies every reference in this file.
+
+- tag:    mlt_temp
   slot:   0
   rom:    "28-68-23-A9-41-24-07-13"
   offset: -0.2
   roc_enabled: true
-- sensor: mlt_inlet
+- tag:    mlt_inlet_temp
   slot:   1
   rom:    "28-D2-D0-5A-0F-00-00-76"
   offset: -0.2
   roc_enabled: false
-- sensor: mlt_outlet
+- tag:    mlt_outlet_temp
   slot:   2
   rom:    "28-DF-4F-5B-0F-00-00-6B"
   offset: -0.2
   roc_enabled: false
-- sensor: bk
+- tag:    bk_temp
   slot:   3
   rom:    "28-53-9F-3A-41-24-08-40"
   offset: -0.1
   roc_enabled: true
-- sensor: bk_outlet
+- tag:    bk_outlet_temp
   slot:   4
   rom:    "28-8C-63-5B-0F-00-00-C5"
   offset: -0.2
   roc_enabled: false
-- sensor: hlt
+- tag:    hlt_temp
   slot:   5
   rom:    "28-05-38-77-50-25-0B-04"
   offset: -0.1
   roc_enabled: true
-- sensor: chill_inlet
+- tag:    chill_inlet_temp
   slot:   6
   rom:    "28-42-5B-D5-09-00-00-EE"
   offset: 0.0
   roc_enabled: false
-- sensor: chill_outlet
+- tag:    chill_outlet_temp
   slot:   7
   rom:    "28-FE-60-D5-09-00-00-60"
   offset: 0.0
