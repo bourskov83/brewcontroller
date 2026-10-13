@@ -111,7 +111,8 @@ class ScanTask:
                 if reading is None or reading.status != SensorStatus.OK:
                     # Not yet published (startup) or FAULT: flag it, leave the
                     # tag frozen at its last good value.
-                    log.error(f"sensor {reading} status={reading.status}" )
+                    if reading.status == SensorStatus.STALE:
+                        log.error(f"sensor {reading} status={reading.status}" )
                     fault_word |= (1 << m.slot)
                     continue
                 self.tags.set_raw(m.tag, reading.value)
