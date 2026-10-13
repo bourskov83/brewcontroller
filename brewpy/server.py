@@ -11,6 +11,18 @@ from pymodbus.datastore import (
 from pymodbus import ModbusDeviceIdentification
 from plc import SoftPLC
 from modbus_rtu_client import ModbusRTUClient,AsyncModbusRTUClient
+import os
+
+# --------------------------------------------------------
+# Environment variables
+# --------------------------------------------------------
+
+MODBUS_RTU_PORT     = os.getenv("MODBUS_RTU_PORT")
+MODBUS_RTU_BAUD     = os.getenv("MODBUS_RTU_BAUD", 38400)
+MODBUS_RTU_PARITY   = os.getenv("MODBUS_RTU_PARITY", "N")
+MODBUS_RTU_STOPBIT  = os.getenv("MODBUS_RTU_STOPBIT", 1)
+MODBUS_RTU_BYTESIZE = os.getenv("MODBUS_RTU_BYTESIZE", 8)
+MODBUS_RTU_TIMEOUT  = os.getenv("MODBUS_RTU_TIMEOUT", 0.3)
 
 
 # --------------------------------------------------------
@@ -62,12 +74,12 @@ async def main():
     )
     try:
         rtu_sync = ModbusRTUClient(
-            port="/dev/cu.usbserial-A50285BI",
-            baudrate=38400,
-            parity="N",
-            stopbits=1,
-            bytesize=8,
-            timeout=0.3,
+            port=MODBUS_RTU_PORT,
+            baudrate=MODBUS_RTU_BAUD,
+            parity=MODBUS_RTU_PARITY,
+            stopbits=MODBUS_RTU_STOPBIT,
+            bytesize=MODBUS_RTU_BYTESIZE,
+            timeout=MODBUS_RTU_TIMEOUT,
         )
     except:
         rtu_sync = None
