@@ -1,42 +1,29 @@
 """
-Top-level SoftPLC: owns shared state (tags, , RTU client) and wires
+Top-level SoftPLC: owns shared state (tags, sensor store, RTU client) and wires
 together the three background tasks. The actual task logic now lives in
-plc/scan.py, plc/bridge.py, and plc/sensors.py — this lass is just
+plc/scan.py, plc/bridge.py, and plc/sensors.py — this class is just
 construction + lifecycle (start/stop).
 """
 import asyncio
 
 from logger_config import log
-from tagmap import Tags, load_tags
-from pymodbus.datastore import ModbusServerContext
-
-from modbus_rtu_client import AsyncModbusRTUClient
+from tagmap import Tags
 
 from plc.sensors import SensorIO
 from plc.scan import ScanTask
 from plc.bridge import BridgeTask
-from plc.sensor_map import SensorMapping, load_sensor_map
 from plc.sensor_store import SensorStore
 
 
 class SoftPLC:
-    def __init__(self, context: ModbusServerContext, rtu: AsyncModbusRTUClient,
-                 tagmap_path: str = "tags.yaml", sensor_map_file: str = "sensors.yaml"):
-        self.context = context
-        self.rtu = rtu
-
-        self._tagmap = load_tags(tagmap_path)
-        self.tags = Tags(store=context[0x00], mapping=self._tagmap)
-        
-
-        self._sensormap = load_sensor_map(sensor_map_file)
+    def __init__(self, context, rtu, tag_defs, device, sensor_map):
+        self.device = device
+        self.tags = Tags(store=context[0x00], tags=tag_defs)
         self.sensor_store = SensorStore()
-        self.sensors = SensorIO(rtu=self.rtu, store=self.sensor_store, sensor_map=self._sensormap)
-        self.scan_task = ScanTask(tags=self.tags, rtu=self.rtu, store=self.sensor_store)
-        self.bridge_task = BridgeTask(tags=self.tags, scan_task=self.scan_task)
-        self.bridge_task.attach_sensors(self.sensors)
-
-        self._tasks: list[asyncio.Task] = []
+        self.sensors = SensorIO(rtu, self.sensor_store, sensor_map, device)
+        self.scan_task = ScanTask(self.tags, rtu, self.sensor_store, sensor_map, device)
+        self.bridge_task = BridgeTask(self.tags)
+        self._tasks = []
 
     async def start(self):
         """Start the PLC runtime: background tasks for scan, temps, bridge, etc."""
@@ -44,7 +31,7 @@ class SoftPLC:
         self._tasks = [
             asyncio.create_task(self.scan_task.run(), name="scan_task"),
             asyncio.create_task(self.sensors.sensor_update_task(), name="sensor_update_task"),
-            asyncio.create_task(self.bridge_task.run(self._tagmap), name="modbus_bridge_task"),
+            asyncio.create_task(self.bridge_task.run(), name="modbus_bridge_task"),
         ]
 
     async def stop(self):

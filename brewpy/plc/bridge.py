@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Callable, Awaitable
 
 from logger_config import log
-from plc.scaling import reg_to_float, float_to_reg
 
 PID_PARAMS_PATH = Path("pid_params.yaml")
 
@@ -13,9 +12,8 @@ PID_PARAMS_PATH = Path("pid_params.yaml")
 class BridgeTask:
     """Owns PID config loading + the command-coil polling loop."""
 
-    def __init__(self, tags, scan_task, poll_interval: float = 0.1):
+    def __init__(self, tags, poll_interval: float = 0.1):
         self.tags = tags
-        self.scan_task = scan_task  # to push mode flags through
         self.sensors = None  # set via attach_sensors(); avoids a circular import at module load
         self.poll_interval = poll_interval
 
@@ -33,13 +31,13 @@ class BridgeTask:
     # Startup
     # ------------------------------------------------------------------
 
-    async def initialize(self, tagmap: dict) -> None:
+    async def initialize(self) -> None:
         try:
             """One-time setup: zero coils, pull sensor config, load PID params."""
             log.debug("init")
-            for name, tag in tagmap.items():
-                if tag.table == 1:  # coils table
-                    self.tags.write(name, False)
+            for name, tag in self.tags.defs.items():
+                if tag.table == "coil":
+                    self.tags.set_raw(name, False, override=True)
 
 
         except Exception as e:
@@ -49,10 +47,10 @@ class BridgeTask:
     # Main loop
     # ------------------------------------------------------------------
 
-    async def run(self, tagmap: dict):
+    async def run(self):
         log.info("modbus_bridge_task started")
         try:
-            await self.initialize(tagmap)
+            await self.initialize()
             
 
             while True:

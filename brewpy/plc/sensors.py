@@ -2,9 +2,8 @@
 Everything to do with the DS18B20 temperature sensors on the RTU slave:
 
 - the slow polling loop that refreshes the shared SensorStore
-- reading/writing the sensor ROM table (the "which physical sensor maps
-  to which channel" config)
-- reading/writing per-channel calibration offsets
+- applying the per-sensor calibration offset from sensors.yaml
+  (the ROM table itself is pushed by sensor_config.py, not here)
 
 Split out of SoftPLC because it's a self-contained concern: it only needs
 an RTU client and a SensorStore to publish into, not any PID/scan state
@@ -12,26 +11,9 @@ or Modbus-server tag access. Publishing readings to tags/historian is
 scan.py's job (single-writer principle) — this module never touches tags.
 """
 import asyncio
-from typing import List, Optional
-
 from logger_config import log
-from plc.sensor_map import SensorMapping
-from plc.scaling import float_to_reg, unsigned_to_signed16
-from plc.sensor_store import SensorStore, SensorStatus
-
-# Sentinel the ESP32 writes into a slot's register when it has no reading
-# for it this cycle (sensor missing/unmapped/CRC fail) — see
-# esp32_firmware/src/config.h TEMP_INVALID_SENTINEL.
-TEMP_INVALID_SENTINEL = -32768
-
-APPLY_CONFIG_ADDR = 200
-APPLY_CONFIG_VALUE = [0xA5A5]
-
-SENSOR_COUNT_ADDR = 300
-ROM_TABLE_ADDR = 301
-ROM_CONFIG_WRITE_ADDR = 100
-OFFSET_BASE_ADDR = 50
-OFFSET_COUNT = 10  # 5 channels x 2 regs? kept as original magic number
+from plc.scaling import unsigned_to_signed16
+from plc.sensor_store import SensorStatus
 
 
 class SensorIO:
@@ -40,13 +22,11 @@ class SensorIO:
     polling, ROM table management, and offset calibration.
     """
 
-    def __init__(self, rtu, store: SensorStore, sensor_map: List[SensorMapping],
-                 temp_base_addr: int = 10, temp_count: int = 8):
+    def __init__(self, rtu, store, sensor_map, device):
         self.rtu = rtu
         self.store = store
         self.sensor_map = sensor_map
-        self._temp_base_addr = temp_base_addr
-        self._temp_count = temp_count
+        self.device = device
 
 
     # ------------------------------------------------------------------
@@ -60,17 +40,17 @@ class SensorIO:
         while True:
             t0 = loop.time()
             try:
-                await self._poll_block(base_addr=self._temp_base_addr)
+                await self._poll_block()
             except Exception as E:
                 log.error(E)
 
             elapsed = loop.time() - t0
             await asyncio.sleep(max(0, poll_freq - elapsed))
 
-    async def _poll_block(self, base_addr: int) -> None:
+    async def _poll_block(self) -> None:
         """Read one block of temp registers and publish each to the SensorStore."""
         try:
-            regs = await self.rtu.read_hregs(base_addr, self._temp_count)
+            regs = await self.rtu.read_hregs(self.device.temps.hreg_base, self.device.temps.count)
         except Exception as e:
             log.warning(f"Temperature block read failed: {e}")
             return
@@ -83,7 +63,7 @@ class SensorIO:
                     continue
 
                 raw = unsigned_to_signed16(regs[m.slot])
-                if raw == TEMP_INVALID_SENTINEL:
+                if raw == self.device.temps.invalid:
                     # ESP32 has no reading for this slot right now (sensor
                     # missing / not yet discovered / CRC failure on the bus).
                     await self.store.update(m.tag, None, SensorStatus.FAULT)
@@ -91,7 +71,7 @@ class SensorIO:
 
                 # Apply sensor calibration offset before publishing (still
                 # in signed degC x100 register space).
-                corrected_temp = raw + float_to_reg(m.offset)[0]
+                corrected_temp = raw + round(m.offset * self.device.temps.scale)
                 await self.store.update(m.tag, corrected_temp, SensorStatus.OK)
 
         except Exception as e:
